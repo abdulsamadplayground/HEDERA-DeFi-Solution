@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Hedera Key Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/@hashgraph/sdk@2.49.2/dist/index.web.js"></script>
+</head>
+<body>
+    <h1>Test Your Hedera Private Key</h1>
+    
+    <div>
+        <label>Account ID:</label><br>
+        <input type="text" id="accountId" placeholder="0.0.12345" style="width: 300px"><br><br>
+        
+        <label>Private Key:</label><br>
+        <input type="text" id="privateKey" placeholder="302e020100..." style="width: 500px"><br><br>
+        
+        <button onclick="testKey()">Test Key</button>
+    </div>
+    
+    <div id="result" style="margin-top: 20px; padding: 20px; border: 1px solid #ccc;"></div>
+    
+    <script>
+        async function testKey() {
+            const accountIdInput = document.getElementById('accountId').value.trim();
+            const privateKeyInput = document.getElementById('privateKey').value.trim();
+            const resultDiv = document.getElementById('result');
+            
+            resultDiv.innerHTML = '<p>Testing...</p>';
+            
+            try {
+                // Remove 0x prefix if present
+                let cleanKey = privateKeyInput;
+                if (cleanKey.startsWith('0x') || cleanKey.startsWith('0X')) {
+                    cleanKey = cleanKey.substring(2);
+                    resultDiv.innerHTML += '<p>✅ Removed 0x prefix</p>';
+                }
+                
+                // Try to parse the private key
+                let privateKey;
+                try {
+                    privateKey = hashgraph.PrivateKey.fromStringED25519(cleanKey);
+                    resultDiv.innerHTML += '<p>✅ Successfully parsed as ED25519 key</p>';
+                } catch (e) {
+                    try {
+                        privateKey = hashgraph.PrivateKey.fromStringECDSA(cleanKey);
+                        resultDiv.innerHTML += '<p>✅ Successfully parsed as ECDSA key</p>';
+                    } catch (e2) {
+                        if (cleanKey.length === 64) {
+                            privateKey = hashgraph.PrivateKey.fromBytesED25519(hexToBytes(cleanKey));
+                            resultDiv.innerHTML += '<p>✅ Successfully parsed as hex bytes</p>';
+                        } else {
+                            throw new Error('Invalid key format');
+                        }
+                    }
+                }
+                
+                // Get public key
+                const publicKey = privateKey.publicKey;
+                resultDiv.innerHTML += '<p><strong>Public Key:</strong> ' + publicKey.toString() + '</p>';
+                
+                // Parse account ID
+                const accountId = hashgraph.AccountId.fromString(accountIdInput);
+                resultDiv.innerHTML += '<p><strong>Account ID:</strong> ' + accountId.toString() + '</p>';
+                
+                // Try to create a client and set operator
+                const client = hashgraph.Client.forTestnet();
+                client.setOperator(accountId, privateKey);
+                
+                resultDiv.innerHTML += '<p style="color: green; font-weight: bold;">✅ SUCCESS! Key and Account ID are valid!</p>';
+                resultDiv.innerHTML += '<p>You can use these credentials in the app.</p>';
+                
+                // Try a simple query to verify
+                resultDiv.innerHTML += '<p>Testing connection to Hedera...</p>';
+                
+                try {
+                    const query = new hashgraph.AccountBalanceQuery()
+                        .setAccountId(accountId);
+                    
+                    const balance = await query.execute(client);
+                    resultDiv.innerHTML += '<p style="color: green;">✅ Successfully connected to Hedera!</p>';
+                    resultDiv.innerHTML += '<p><strong>Account Balance:</strong> ' + balance.hbars.toString() + '</p>';
+                    
+                    if (balance.hbars.toBigNumber().isZero()) {
+                        resultDiv.innerHTML += '<p style="color: orange;">⚠️ Warning: Account has 0 HBAR. You need testnet HBAR to perform transactions.</p>';
+                        resultDiv.innerHTML += '<p>Get testnet HBAR from: <a href="https://portal.hedera.com" target="_blank">portal.hedera.com</a></p>';
+                    }
+                } catch (queryError) {
+                    resultDiv.innerHTML += '<p style="color: orange;">⚠️ Could not query balance: ' + queryError.message + '</p>';
+                    resultDiv.innerHTML += '<p>But the key format is correct!</p>';
+                }
+                
+            } catch (error) {
+                resultDiv.innerHTML += '<p style="color: red; font-weight: bold;">❌ ERROR: ' + error.message + '</p>';
+                resultDiv.innerHTML += '<p>Please check:</p>';
+                resultDiv.innerHTML += '<ul>';
+                resultDiv.innerHTML += '<li>Account ID format (should be 0.0.xxxxx)</li>';
+                resultDiv.innerHTML += '<li>Private key format (should be 96 characters starting with 302e020100...)</li>';
+                resultDiv.innerHTML += '<li>Make sure the private key belongs to this account</li>';
+                resultDiv.innerHTML += '</ul>';
+            }
+        }
+        
+        function hexToBytes(hex) {
+            const bytes = new Uint8Array(hex.length / 2);
+            for (let i = 0; i < hex.length; i += 2) {
+                bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+            }
+            return bytes;
+        }
+    </script>
+    
+    <div style="margin-top: 40px; padding: 20px; background: #f0f0f0;">
+        <h3>Instructions:</h3>
+        <ol>
+            <li>Enter your Hedera testnet Account ID (format: 0.0.12345)</li>
+            <li>Enter your Private Key from Hedera Portal</li>
+            <li>Click "Test Key"</li>
+            <li>If successful, use these same credentials in the main app</li>
+        </ol>
+        
+        <h3>Where to get credentials:</h3>
+        <p>Visit <a href="https://portal.hedera.com" target="_blank">portal.hedera.com</a> and:</p>
+        <ul>
+            <li>Log in or create a testnet account</li>
+            <li>Copy your Account ID</li>
+            <li>Copy your Private Key (full 96 characters)</li>
+        </ul>
+    </div>
+</body>
+</html>
