@@ -21,6 +21,8 @@ function QuestGame({ onWin, onLose, gameType }) {
   const [keys, setKeys] = useState({});
   const gameLoopRef = useRef(null);
   const spawnTimerRef = useRef(0);
+  const monstersRef = useRef([]);
+  const fireballsRef = useRef([]);
 
   const monstersPerWave = 12;
   const maxWaves = 3;
@@ -151,7 +153,8 @@ function QuestGame({ onWin, onLose, gameType }) {
     }
 
     // Move monsters
-    setMonsters(prev => prev.map(monster => {
+    setMonsters(prev => {
+      const updated = prev.map(monster => {
       let newX = monster.x;
       let newY = monster.y + monster.speed;
       let updatedMonster = { ...monster };
@@ -205,10 +208,89 @@ function QuestGame({ onWin, onLose, gameType }) {
         }
       }
       return true;
-    }));
+    });
+      monstersRef.current = updated;
+      return updated;
+    });
 
-    // Move fireballs
-    setFireballs(prev => prev.map(fb => ({ ...fb, y: fb.y - 5 })).filter(fb => fb.y > 0));
+    // Move fireballs and check collisions in single update
+    const currentMonsters = monstersRef.current;
+    setFireballs(prevFireballs => {
+      const movedFireballs = prevFireballs.map(fb => ({ ...fb, y: fb.y - 5 })).filter(fb => fb.y > 0);
+      
+      // Find which monsters were hit
+      const hitMonsterIds = new Set();
+      const remainingFireballs = movedFireballs.filter(fb => {
+        let hit = false;
+        currentMonsters.forEach(m => {
+          const distance = Math.sqrt(Math.pow(fb.x - m.x, 2) + Math.pow(fb.y - m.y, 2));
+          if (!hitMonsterIds.has(m.id) && distance < 6) {
+            console.log('[QuestGame] Fireball hit monster!', m.name || m.emoji, 'HP:', m.hp);
+            hit = true;
+            hitMonsterIds.add(m.id);
+          }
+        });
+        return !hit;
+      });
+      
+      // Update monsters that were hit
+      if (hitMonsterIds.size > 0) {
+        setMonsters(prevMonsters => {
+          const updated = prevMonsters.map(m => {
+            if (hitMonsterIds.has(m.id)) {
+              const newHp = m.hp - 1;
+              console.log('[QuestGame] Monster damaged:', m.name || m.emoji, 'New HP:', newHp);
+              if (newHp <= 0) {
+                console.log('[QuestGame] Monster killed!', m.name || m.emoji);
+                setScore(s => s + m.points);
+                if (Math.random() < 0.25) spawnBuff(m.x, m.y);
+                if (m.isBoss) {
+                  handleBossDefeat(m);
+                } else {
+                  setMonstersKilled(prev => prev + 1);
+                }
+                return null;
+              }
+              return { ...m, hp: newHp };
+            }
+            return m;
+          }).filter(Boolean);
+          monstersRef.current = updated;
+          return updated;
+        });
+      }
+      
+      fireballsRef.current = remainingFireballs;
+      return remainingFireballs;
+    });
+
+    // Handle slash collisions
+    if (slashing) {
+      setMonsters(prevMonsters => {
+        const updated = prevMonsters.map(monster => {
+          const distance = Math.sqrt(Math.pow(monster.x - playerPos.x, 2) + Math.pow(monster.y - playerPos.y, 2));
+          if (distance < 12) {
+            console.log('[QuestGame] Slash hit monster!', monster.name || monster.emoji, 'HP:', monster.hp);
+            const newHp = monster.hp - 1;
+            if (newHp <= 0) {
+              console.log('[QuestGame] Monster slashed to death!', monster.name || monster.emoji);
+              setScore(s => s + monster.points);
+              if (Math.random() < 0.25) spawnBuff(monster.x, monster.y);
+              if (monster.isBoss) {
+                handleBossDefeat(monster);
+              } else {
+                setMonstersKilled(prev => prev + 1);
+              }
+              return null;
+            }
+            return { ...monster, hp: newHp };
+          }
+          return monster;
+        }).filter(Boolean);
+        monstersRef.current = updated;
+        return updated;
+      });
+    }
 
     // Move buffs
     setBuffs(prev => prev.map(buff => ({ ...buff, y: buff.y + 1.5 })).filter(buff => {
@@ -223,68 +305,9 @@ function QuestGame({ onWin, onLose, gameType }) {
       }
       return true;
     }));
-
-    // Handle collisions
-    if (slashing) handleSlashCollision();
-    handleFireballCollision();
   };
 
-  const handleSlashCollision = () => {
-    setMonsters(prev => prev.map(monster => {
-      if (Math.abs(monster.y - playerPos.y) < 10 && Math.abs(monster.x - playerPos.x) < 10) {
-        const newHp = monster.hp - 1;
-        if (newHp <= 0) {
-          setScore(s => s + monster.points);
-          if (Math.random() < 0.25) spawnBuff(monster.x, monster.y);
-          if (monster.isBoss) {
-            handleBossDefeat(monster);
-          } else {
-            setMonstersKilled(prev => prev + 1);
-          }
-          return null;
-        }
-        return { ...monster, hp: newHp };
-      }
-      return monster;
-    }).filter(Boolean));
-  };
 
-  const handleFireballCollision = () => {
-    setMonsters(prevMonsters => {
-      const hitMonsters = new Set();
-      
-      // Check collisions with current fireballs
-      setFireballs(prevFireballs => prevFireballs.filter(fb => {
-        let hit = false;
-        prevMonsters.forEach(m => {
-          if (!hitMonsters.has(m.id) && Math.abs(fb.x - m.x) < 4 && Math.abs(fb.y - m.y) < 4) {
-            hit = true;
-            hitMonsters.add(m.id);
-          }
-        });
-        return !hit;
-      }));
-
-      // Update monsters that were hit
-      return prevMonsters.map(m => {
-        if (hitMonsters.has(m.id)) {
-          const newHp = m.hp - 1;
-          if (newHp <= 0) {
-            setScore(s => s + m.points);
-            if (Math.random() < 0.25) spawnBuff(m.x, m.y);
-            if (m.isBoss) {
-              handleBossDefeat(m);
-            } else {
-              setMonstersKilled(prev => prev + 1);
-            }
-            return null;
-          }
-          return { ...m, hp: newHp };
-        }
-        return m;
-      }).filter(Boolean);
-    });
-  };
 
   const handleBossDefeat = (boss) => {
     console.log(`[QuestGame] Boss ${boss.name} defeated! Wave ${wave} complete.`);
