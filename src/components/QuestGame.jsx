@@ -37,12 +37,17 @@ function QuestGame({ onWin, onLose, gameType }) {
   };
 
   const getWaveBackground = () => {
-    const baseImage = 'url(/assets/backgrounds/forest.png)';
+    const backgrounds = [
+      'url(/assets/backgrounds/forest.jpeg)',
+      'url(/assets/backgrounds/dungeon.jpeg)',
+      'url(/assets/backgrounds/tower.jpeg)'
+    ];
     const overlays = [
       'linear-gradient(rgba(45, 80, 22, 0.4), rgba(30, 58, 15, 0.5))',
       'linear-gradient(rgba(26, 26, 46, 0.6), rgba(10, 10, 20, 0.7))',
       'linear-gradient(rgba(74, 10, 46, 0.5), rgba(42, 5, 24, 0.6))'
     ];
+    const baseImage = backgrounds[wave - 1] || backgrounds[0];
     return `${overlays[wave - 1] || overlays[0]}, ${baseImage}`;
   };
 
@@ -522,7 +527,7 @@ function QuestGame({ onWin, onLose, gameType }) {
 }
 
 const styles = {
-  container: { padding: '20px', maxWidth: '900px', margin: '0 auto', fontFamily: 'Arial, sans-serif', backgroundColor: '#1a1a2e', borderRadius: '10px', color: '#fff' },
+  container: { padding: '20px', maxWidth: '95vw', width: '100%', minHeight: '85vh', margin: '0 auto', fontFamily: 'Arial, sans-serif', backgroundColor: '#1a1a2e', borderRadius: '10px', color: '#fff' },
   header: { textAlign: 'center', marginBottom: '20px' },
   title: { fontSize: '28px', margin: '0 0 10px 0', color: '#ffd700' },
   subtitle: { margin: 0, color: '#aaa', fontSize: '13px' },
@@ -533,7 +538,7 @@ const styles = {
   healthText: { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', fontSize: '10px', fontWeight: 'bold', color: '#fff', textShadow: '1px 1px 2px rgba(0,0,0,0.8)', zIndex: 1 },
   buffsRow: { display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '10px', minHeight: '30px', flexWrap: 'wrap' },
   buff: { padding: '5px 12px', backgroundColor: '#4a5568', borderRadius: '15px', fontSize: '12px', fontWeight: 'bold' },
-  gameArea: { position: 'relative', width: '100%', height: '550px', borderRadius: '8px', overflow: 'hidden', marginBottom: '15px', boxShadow: 'inset 0 0 80px rgba(0, 0, 0, 0.6)', border: '3px solid #667eea' },
+  gameArea: { position: 'relative', width: '100%', height: '65vh', minHeight: '500px', borderRadius: '8px', overflow: 'hidden', marginBottom: '15px', boxShadow: 'inset 0 0 80px rgba(0, 0, 0, 0.6)', border: '3px solid #667eea' },
   player: { position: 'absolute', fontSize: '36px', transform: 'translate(-50%, -50%)', transition: 'font-size 0.1s ease', filter: 'drop-shadow(0 0 12px rgba(255, 215, 0, 0.9))', zIndex: 200 },
   monster: { position: 'absolute', fontSize: '36px', transform: 'translateX(-50%)', filter: 'drop-shadow(0 0 10px rgba(255, 0, 0, 0.7))' },
   hp: { position: 'absolute', top: '-28px', left: '50%', transform: 'translateX(-50%)', fontSize: '11px', backgroundColor: '#e53e3e', padding: '4px 10px', borderRadius: '6px', fontWeight: 'bold', whiteSpace: 'nowrap', minWidth: '60px', textAlign: 'center', border: '2px solid #fff' },

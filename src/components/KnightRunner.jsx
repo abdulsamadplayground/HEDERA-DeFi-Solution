@@ -205,7 +205,12 @@ function KnightRunner({ onWin, onLose, stakeAmount, gameType }) {
         </div>
       </div>
 
-      <div className="dino-runner-game">
+      <div className="dino-runner-game" style={{
+        backgroundImage: 'url(/assets/backgrounds/ruins.jpeg)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }}>
         <div className="ground"></div>
         <div 
           className={`runner-knight ${isJumping ? 'jumping' : ''} ${isShielding ? 'shielding' : ''}`}

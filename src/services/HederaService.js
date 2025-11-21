@@ -72,6 +72,7 @@ class HederaService {
       
       this.operatorKey = key;
       
+      // Use testnet for testing
       this.client = Client.forTestnet();
       this.client.setOperator(this.operatorId, this.operatorKey);
       this.useMetaMask = false;
@@ -137,6 +138,7 @@ class HederaService {
       
       this.operatorKey = key;
       
+      // Use testnet for testing
       this.client = Client.forTestnet();
       this.client.setOperator(this.operatorId, this.operatorKey);
       this.useMetaMask = true;

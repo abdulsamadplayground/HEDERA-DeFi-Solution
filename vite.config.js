@@ -5,5 +5,20 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000
+  },
+  build: {
+    target: 'esnext',
+    commonjsOptions: {
+      transformMixedEsModules: true
+    }
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      target: 'esnext'
+    }
+  },
+  define: {
+    global: 'globalThis',
+    'process.env': {}
   }
 });

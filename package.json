@@ -16,6 +16,9 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
+    "buffer": "^6.0.3",
+    "stream-browserify": "^3.0.0",
+    "util": "^0.12.5",
     "vite": "^5.4.11"
   }
 }
