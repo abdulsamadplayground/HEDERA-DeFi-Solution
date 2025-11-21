@@ -178,9 +178,9 @@ class HederaService {
       const frozenTx = transaction.freezeWith(this.client);
 
       console.log('[HederaService] Signing with private key...');
-      frozenTx.sign(this.operatorKey);
+      const signedTx = await frozenTx.sign(this.operatorKey);
       console.log('[HederaService] Executing transaction...');
-      const txResponse = await frozenTx.execute(this.client);
+      const txResponse = await signedTx.execute(this.client);
 
       console.log('[HederaService] Transaction ID:', txResponse.transactionId.toString());
       console.log('[HederaService] Getting receipt...');
@@ -227,9 +227,9 @@ class HederaService {
       const frozenMintTx = mintTx.freezeWith(this.client);
 
       console.log('[HederaService] Signing mint with private key...');
-      frozenMintTx.sign(this.operatorKey);
+      const signedMintTx = await frozenMintTx.sign(this.operatorKey);
       console.log('[HederaService] Executing mint transaction...');
-      const mintResponse = await frozenMintTx.execute(this.client);
+      const mintResponse = await signedMintTx.execute(this.client);
 
       console.log('[HederaService] Mint transaction ID:', mintResponse.transactionId.toString());
       console.log('[HederaService] Getting mint receipt...');
@@ -404,9 +404,9 @@ class HederaService {
       const frozenMintTx = mintTx.freezeWith(this.client);
 
       console.log('[HederaService] Signing mint with private key...');
-      frozenMintTx.sign(this.operatorKey);
+      const signedMintTx = await frozenMintTx.sign(this.operatorKey);
       console.log('[HederaService] Executing mint transaction...');
-      const mintResponse = await frozenMintTx.execute(this.client);
+      const mintResponse = await signedMintTx.execute(this.client);
 
       console.log('[HederaService] Mint transaction ID:', mintResponse.transactionId.toString());
       console.log('[HederaService] Getting mint receipt...');
@@ -446,3 +446,5 @@ class HederaService {
 }
 
 export default new HederaService();
+
+
