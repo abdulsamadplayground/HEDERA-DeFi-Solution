@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import TicTacToe from './TicTacToe';
-import PatternMatch from './PatternMatch';
-import SpaceShooter from './SpaceShooter';
+import KnightRunner from './KnightRunner';
+import QuestGame from './QuestGame';
 import './Games.css';
 
 function GameSelector({ onGameWin, onGameLose }) {
@@ -18,22 +18,22 @@ function GameSelector({ onGameWin, onGameLose }) {
       component: TicTacToe
     },
     {
-      id: 'pattern',
-      name: 'Pattern Match',
-      icon: '🍬',
-      description: 'Match patterns to unlock bigger stakes!',
+      id: 'runner',
+      name: 'Knight Runner',
+      icon: '🏃',
+      description: 'Score-based staking - your score = your stake!',
       difficulty: 'medium',
-      stakeAmount: 100,
-      component: PatternMatch
+      stakeAmount: null,
+      component: KnightRunner
     },
     {
-      id: 'shooter',
-      name: 'Space Shooter',
-      icon: '🚀',
-      description: 'Higher score = Higher stake amount!',
+      id: 'quest',
+      name: 'Knight\'s Quest',
+      icon: '⚔️',
+      description: 'Clear 5 waves to earn maximum stakes!',
       difficulty: 'hard',
-      maxStake: 500,
-      component: SpaceShooter
+      maxStake: 1000,
+      component: QuestGame
     }
   ];
 
@@ -98,8 +98,10 @@ function GameSelector({ onGameWin, onGameLose }) {
             </div>
             <p>{game.description}</p>
             <div className="game-stake-info">
-              {game.stakeAmount ? (
+              {game.id === 'tictactoe' ? (
                 `Win to stake ${game.stakeAmount} HBAR`
+              ) : game.id === 'runner' ? (
+                `Score-based stake (score = HBAR staked)`
               ) : (
                 `Score-based stake (up to ${game.maxStake} HBAR)`
               )}
@@ -112,9 +114,9 @@ function GameSelector({ onGameWin, onGameLose }) {
         <div className="info-box">
           <h4>How It Works:</h4>
           <ul>
-            <li><strong>Easy Games</strong> - Win to stake small amounts (25 HBAR)</li>
-            <li><strong>Medium Games</strong> - Win to stake medium amounts (100 HBAR)</li>
-            <li><strong>Hard Games</strong> - Score determines stake amount (up to 500 HBAR)</li>
+            <li><strong>Tic Tac Toe</strong> - Win to stake 25 HBAR</li>
+            <li><strong>Knight Runner</strong> - Your score becomes your stake (reach 500 to win)</li>
+            <li><strong>Knight's Quest</strong> - Clear waves to earn up to 1000 HBAR (125 per wave + 75 per boss)</li>
           </ul>
           <p style={{marginTop: '15px', color: '#667eea', fontWeight: '600'}}>
             💡 Higher difficulty = Higher potential stakes!
