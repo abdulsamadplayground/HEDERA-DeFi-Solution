@@ -35,12 +35,27 @@ function KnightRunner({ onWin, onLose, stakeAmount, gameType }) {
   const gameLoop = () => {
     if (obstacles.length === 0 || obstacles[obstacles.length - 1].x < 70) {
       if (Math.random() < 0.012) {
-        const obstacleTypes = [
-          { emoji: '🪨', height: 'short', hitboxHeight: 8 },
-          { emoji: '🌵', height: 'short', hitboxHeight: 8 },
-          { emoji: '🔥', height: 'tall', hitboxHeight: 12 },
-          { emoji: '⚔️', height: 'short', hitboxHeight: 8 }
+        // Determine obstacle types based on score (add flying enemies after 100 points)
+        const groundObstacles = [
+          { emoji: '🪨', height: 'short', hitboxHeight: 8, type: 'ground' },
+          { emoji: '🌵', height: 'short', hitboxHeight: 8, type: 'ground' },
+          { emoji: '🔥', height: 'tall', hitboxHeight: 12, type: 'ground' },
+          { emoji: '⚔️', height: 'short', hitboxHeight: 8, type: 'ground' }
         ];
+        
+        const flyingObstacles = [
+          { emoji: '🦅', height: 'flying', hitboxHeight: 8, type: 'flying', flyHeight: 25 },
+          { emoji: '🦇', height: 'flying', hitboxHeight: 8, type: 'flying', flyHeight: 20 },
+          { emoji: '🐉', height: 'flying', hitboxHeight: 10, type: 'flying', flyHeight: 22 }
+        ];
+        
+        let obstacleTypes = [...groundObstacles];
+        
+        // Add flying enemies after score 100
+        if (score >= 100) {
+          obstacleTypes = [...groundObstacles, ...flyingObstacles];
+        }
+        
         const obstacle = obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)];
         setObstacles(prev => [...prev, { id: Date.now(), x: 110, ...obstacle }]);
       }
@@ -51,7 +66,24 @@ function KnightRunner({ onWin, onLose, stakeAmount, gameType }) {
       x: obs.x - gameSpeed * 0.6
     })).filter(obs => {
       if (obs.x < 10 && obs.x > 6) {
-        if (knightY < obs.hitboxHeight) {
+        // Check collision based on obstacle type
+        let collision = false;
+        
+        if (obs.type === 'flying') {
+          // Flying obstacle collision (check if player is jumping at that height)
+          const playerHeight = knightY * 2.5; // Convert to pixels
+          const flyingHeight = obs.flyHeight * 2.5; // Convert to pixels
+          if (Math.abs(playerHeight - flyingHeight) < 30) {
+            collision = true;
+          }
+        } else {
+          // Ground obstacle collision
+          if (knightY < obs.hitboxHeight) {
+            collision = true;
+          }
+        }
+        
+        if (collision) {
           if (isShielding) {
             return false;
           } else {
@@ -77,6 +109,7 @@ function KnightRunner({ onWin, onLose, stakeAmount, gameType }) {
       }
     }
 
+    // End game when reaching max score of 500
     if (score >= targetScore) {
       endGame(true);
     }
@@ -110,11 +143,21 @@ function KnightRunner({ onWin, onLose, stakeAmount, gameType }) {
   const endGame = (won) => {
     setGameOver(true);
     clearInterval(gameLoopRef.current);
+    
+    // Always stake the score amount (whether won or lost)
+    // Won = reached 500, Lost = died before 500
+    const stakeAmount = Math.min(score, targetScore);
+    
     if (won) {
-      // Stake amount equals the score achieved
-      setTimeout(() => onWin(score, { gameType, score, result: 'win' }), 1000);
+      // Reached max score of 500
+      setTimeout(() => onWin(stakeAmount, { gameType, score: stakeAmount, result: 'complete' }), 2000);
     } else {
-      setTimeout(() => onLose(), 1000);
+      // Died before reaching 500, but still stake the score
+      if (score > 0) {
+        setTimeout(() => onWin(stakeAmount, { gameType, score: stakeAmount, result: 'partial' }), 2000);
+      } else {
+        setTimeout(() => onLose(), 1000);
+      }
     }
   };
 
@@ -150,11 +193,11 @@ function KnightRunner({ onWin, onLose, stakeAmount, gameType }) {
     <div className="game-container">
       <div className="game-header">
         <h3>🏃 Knight Runner</h3>
-        <p>Score {targetScore} points to stake your score in HBAR!</p>
+        <p>Score as much as you can! Your score = HBAR staked (Max: 500 HBAR)</p>
       </div>
 
       <div className="game-stats">
-        <div className="stat">Score: {score}/{targetScore}</div>
+        <div className="stat">Score: {score} HBAR {score >= 100 && '(Flying enemies active!)'}</div>
         <div className="stat">Lives: {'❤️'.repeat(lives)}{'🖤'.repeat(3 - lives)}</div>
         <div className="stat">Speed: {gameSpeed.toFixed(1)}x</div>
         <div className="stat">
@@ -171,7 +214,14 @@ function KnightRunner({ onWin, onLose, stakeAmount, gameType }) {
           {isShielding ? '🛡️' : '🧙‍♂️'}
         </div>
         {obstacles.map(obs => (
-          <div key={obs.id} className={`runner-obstacle ${obs.height}`} style={{ left: `${obs.x}%` }}>
+          <div 
+            key={obs.id} 
+            className={`runner-obstacle ${obs.height}`} 
+            style={{ 
+              left: `${obs.x}%`,
+              bottom: obs.type === 'flying' ? `${obs.flyHeight * 2.5}px` : '0'
+            }}
+          >
             {obs.emoji}
           </div>
         ))}
@@ -196,10 +246,11 @@ function KnightRunner({ onWin, onLose, stakeAmount, gameType }) {
       {gameOver && (
         <div className="game-result">
           {score >= targetScore ? (
-            <p className="win">🎉 You Won! Staking {score} HBAR...</p>
+            <p className="win">🏆 Trial Complete! Maximum Score Reached! Staking {score} HBAR...</p>
           ) : (
             <>
-              <p className="lose">💀 Game Over! Score: {score}/{targetScore}</p>
+              <p className="lose">💀 Game Over! Final Score: {score}</p>
+              <p className="lose">Staking {score} HBAR...</p>
               <button onClick={resetGame} className="btn btn-primary">Try Again</button>
             </>
           )}

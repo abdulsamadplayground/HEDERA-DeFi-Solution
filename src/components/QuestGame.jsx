@@ -11,6 +11,7 @@ function QuestGame({ onWin, onLose, gameType }) {
   const [wave, setWave] = useState(1);
   const [monstersKilled, setMonstersKilled] = useState(0);
   const [isBossActive, setIsBossActive] = useState(false);
+  const [bossSpawned, setBossSpawned] = useState(false);
   const [waveStarting, setWaveStarting] = useState(true);
   const [notification, setNotification] = useState('');
   const [earnedHBAR, setEarnedHBAR] = useState(0);
@@ -21,16 +22,16 @@ function QuestGame({ onWin, onLose, gameType }) {
   const gameLoopRef = useRef(null);
   const spawnTimerRef = useRef(0);
 
-  const monstersPerWave = 10;
+  const monstersPerWave = 12;
   const maxWaves = 3;
   const HBAR_PER_WAVE = 300;
   const COMPLETION_BONUS = 100;
 
   const getBossForWave = (waveNum) => {
     const bosses = [
-      { emoji: '👹', icon: '👹', name: 'Ogre King', hp: 15, maxHp: 15, speed: 0.8, points: 200, damage: 20 },
-      { emoji: '💀', icon: '💀', name: 'Lich King', hp: 20, maxHp: 20, speed: 0.7, points: 300, damage: 30 },
-      { emoji: '🧙‍♀️', icon: '🧙‍♀️', name: 'Dark Witch', hp: 25, maxHp: 25, speed: 0.5, points: 500, damage: 40 }
+      { emoji: '👹', icon: '👹', name: 'Ogre Lord', hp: 15, maxHp: 15, speed: 0.8, points: 200, damage: 20, attackCooldown: 0 },
+      { emoji: '💀', icon: '💀', name: 'Lich King', hp: 20, maxHp: 20, speed: 0.7, points: 300, damage: 30, attackCooldown: 0 },
+      { emoji: '🧙‍♀️', icon: '🧙‍♀️', name: 'Dark Witch', hp: 25, maxHp: 25, speed: 0.5, points: 500, damage: 40, attackCooldown: 0 }
     ];
     return bosses[waveNum - 1];
   };
@@ -50,7 +51,7 @@ function QuestGame({ onWin, onLose, gameType }) {
       gameLoopRef.current = setInterval(gameLoop, 30);
       return () => clearInterval(gameLoopRef.current);
     }
-  }, [monsters, fireballs, buffs, gameOver, health, activeBuffs, slashing, waveStarting, playerPos, keys, monstersKilled, isBossActive]);
+  }, [monsters, fireballs, buffs, gameOver, health, activeBuffs, slashing, waveStarting, playerPos, keys, monstersKilled, isBossActive, bossSpawned]);
 
   useEffect(() => {
     showNotification('⚔️ Wave 1 Starting!', 2000);
@@ -85,21 +86,39 @@ function QuestGame({ onWin, onLose, gameType }) {
   };
 
   const spawnBoss = () => {
+    // Double-check to prevent duplicate spawns
+    if (bossSpawned || isBossActive) {
+      console.log('[QuestGame] Boss spawn prevented - already spawned or active');
+      return;
+    }
+    
     console.log(`[QuestGame] Spawning boss for wave ${wave}`);
     const bossTemplate = getBossForWave(wave);
-    const boss = { ...bossTemplate, id: Date.now() + wave, x: 50, y: 5, isBoss: true };
+    const boss = { ...bossTemplate, id: Date.now() + wave * 1000, x: 50, y: 5, isBoss: true };
     console.log(`[QuestGame] Boss data:`, boss);
+    
+    // Set all states together to prevent race conditions
     setMonsters([boss]);
     setIsBossActive(true);
+    setBossSpawned(true);
+    
     showNotification(`👑 ${boss.name} Appears!`, 2500);
   };
 
   const gameLoop = () => {
-    // Player movement
-    if (keys['ArrowLeft']) setPlayerPos(prev => ({ ...prev, x: Math.max(5, prev.x - 2.5) }));
-    if (keys['ArrowRight']) setPlayerPos(prev => ({ ...prev, x: Math.min(95, prev.x + 2.5) }));
-    if (keys['ArrowUp']) setPlayerPos(prev => ({ ...prev, y: Math.max(15, prev.y - 2.5) }));
-    if (keys['ArrowDown']) setPlayerPos(prev => ({ ...prev, y: Math.min(90, prev.y + 2.5) }));
+    // Player movement (prevent default page scrolling)
+    if (keys['ArrowLeft']) {
+      setPlayerPos(prev => ({ ...prev, x: Math.max(5, prev.x - 2.5) }));
+    }
+    if (keys['ArrowRight']) {
+      setPlayerPos(prev => ({ ...prev, x: Math.min(95, prev.x + 2.5) }));
+    }
+    if (keys['ArrowUp']) {
+      setPlayerPos(prev => ({ ...prev, y: Math.max(15, prev.y - 2.5) }));
+    }
+    if (keys['ArrowDown']) {
+      setPlayerPos(prev => ({ ...prev, y: Math.min(90, prev.y + 2.5) }));
+    }
 
     if (waveStarting) return;
 
@@ -118,15 +137,19 @@ function QuestGame({ onWin, onLose, gameType }) {
       }
     }
 
-    // Check if should spawn boss
-    if (!isBossActive && monstersKilled >= monstersPerWave && monsters.length === 0) {
+    // Check if should spawn boss (only once per wave)
+    // Boss spawns when: not active, not already spawned, killed 12 monsters, and no monsters on screen
+    if (!isBossActive && !bossSpawned && monstersKilled >= monstersPerWave && monsters.length === 0) {
+      console.log('[QuestGame] Boss spawn conditions met - spawning boss');
       spawnBoss();
+      return; // Exit early to prevent any other spawning logic
     }
 
     // Move monsters
     setMonsters(prev => prev.map(monster => {
       let newX = monster.x;
       let newY = monster.y + monster.speed;
+      let updatedMonster = { ...monster };
 
       // Boss behavior
       if (monster.isBoss) {
@@ -135,10 +158,30 @@ function QuestGame({ onWin, onLose, gameType }) {
         } else {
           newY = 20;
           newX += Math.sin(Date.now() / 800) * 0.4;
+          
+          // Boss attacks player
+          updatedMonster.attackCooldown = (updatedMonster.attackCooldown || 0) - 1;
+          if (updatedMonster.attackCooldown <= 0) {
+            // Check if boss can attack player
+            const distanceToPlayer = Math.sqrt(
+              Math.pow(playerPos.x - newX, 2) + Math.pow(playerPos.y - newY, 2)
+            );
+            if (distanceToPlayer < 30) {
+              // Boss attacks!
+              if (activeBuffs.shield <= 0) {
+                setHealth(prev => {
+                  const newHealth = Math.max(0, prev - monster.damage);
+                  if (newHealth <= 0) endGame(false);
+                  return newHealth;
+                });
+              }
+              updatedMonster.attackCooldown = 60; // Attack every 2 seconds
+            }
+          }
         }
       }
 
-      return { ...monster, x: Math.max(5, Math.min(95, newX)), y: newY };
+      return { ...updatedMonster, x: Math.max(5, Math.min(95, newX)), y: newY };
     }).filter(monster => {
       if (monster.y > 100) return false;
       
@@ -235,10 +278,13 @@ function QuestGame({ onWin, onLose, gameType }) {
 
   const handleBossDefeat = (boss) => {
     console.log(`[QuestGame] Boss ${boss.name} defeated! Wave ${wave} complete.`);
-    const newEarned = earnedHBAR + HBAR_PER_WAVE;
-    setEarnedHBAR(newEarned);
+    
+    // Immediately clear boss states to prevent re-spawning
     setIsBossActive(false);
     setMonsters([]);
+    
+    const newEarned = earnedHBAR + HBAR_PER_WAVE;
+    setEarnedHBAR(newEarned);
     showNotification(`✨ ${boss.name} Defeated! +${HBAR_PER_WAVE} HBAR`, 2500);
     
     if (wave >= maxWaves) {
@@ -255,8 +301,12 @@ function QuestGame({ onWin, onLose, gameType }) {
       const nextWave = wave + 1;
       console.log(`[QuestGame] Moving to wave ${nextWave}`);
       setTimeout(() => {
+        // Reset all wave-related states for new wave
+        console.log(`[QuestGame] Resetting for wave ${nextWave}`);
         setWave(nextWave);
         setMonstersKilled(0);
+        setBossSpawned(false); // Critical: Reset boss spawn flag for new wave
+        setIsBossActive(false); // Ensure boss is not active
         setWaveStarting(true);
         spawnTimerRef.current = 0;
         showNotification(`⚔️ Wave ${nextWave} Starting!`, 2000);
@@ -299,9 +349,15 @@ function QuestGame({ onWin, onLose, gameType }) {
 
   const handleKeyDown = (e) => {
     if (gameOver || health <= 0) return;
-    setKeys(prev => ({ ...prev, [e.key]: true }));
-    if (e.key === ' ') {
+    
+    // Prevent default page scrolling for arrow keys and space
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
       e.preventDefault();
+    }
+    
+    setKeys(prev => ({ ...prev, [e.key]: true }));
+    
+    if (e.key === ' ') {
       shootFireball();
     } else if (e.key.toLowerCase() === 'x') {
       slash();
@@ -309,6 +365,10 @@ function QuestGame({ onWin, onLose, gameType }) {
   };
 
   const handleKeyUp = (e) => {
+    // Prevent default page scrolling for arrow keys
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+      e.preventDefault();
+    }
     setKeys(prev => ({ ...prev, [e.key]: false }));
   };
 
@@ -338,6 +398,7 @@ function QuestGame({ onWin, onLose, gameType }) {
     setWave(1);
     setMonstersKilled(0);
     setIsBossActive(false);
+    setBossSpawned(false);
     setWaveStarting(true);
     setNotification('');
     setActiveBuffs({ multishot: 0, shield: 0, attackSpeed: 0 });
@@ -354,7 +415,7 @@ function QuestGame({ onWin, onLose, gameType }) {
     <div style={styles.container}>
       <div style={styles.header}>
         <h3 style={styles.title}>⚔️ Knight's Quest</h3>
-        <p style={styles.subtitle}>Clear all 3 waves! 300 HBAR per wave + 100 HBAR completion bonus = 1000 HBAR total!</p>
+        <p style={styles.subtitle}>Clear all 3 waves! Beat 12 enemies then defeat the boss. 300 HBAR per wave + 100 HBAR completion bonus = 1000 HBAR total!</p>
       </div>
 
       <div style={styles.statsRow}>
