@@ -175,35 +175,75 @@ class MetaMaskService {
         };
       }
 
-      // Prompt user to enter their Hedera credentials
+      // Prompt user to enter their Hedera credentials with clear instructions
       const accountId = prompt(
-        'Please enter your Hedera Testnet Account ID (format: 0.0.xxxxx):\n\n' +
-        'Note: MetaMask is used for connection, but Hedera transactions require your private key.'
+        '🔐 STEP 1: Hedera Account ID\n\n' +
+        '⚠️ IMPORTANT: Enter your ACCOUNT ID, NOT your private key!\n\n' +
+        'Format: 0.0.xxxxx\n' +
+        'Examples: 0.0.12345 or 0.0.7261784\n\n' +
+        '❌ DO NOT enter your private key here\n' +
+        '❌ Private key is long (64+ characters)\n' +
+        '✅ Account ID is short (0.0.xxxxx format)\n\n' +
+        'Get testnet account at: portal.hedera.com'
       );
 
-      if (!accountId || !/^0\.0\.\d+$/.test(accountId)) {
-        throw new Error('Invalid Hedera account ID format. Expected: 0.0.xxxxx');
+      if (!accountId) {
+        throw new Error('❌ Hedera Account ID is required. Please try again.');
+      }
+
+      const trimmedAccountId = accountId.trim();
+      
+      // Check if user entered private key instead of account ID
+      if (trimmedAccountId.length > 20) {
+        throw new Error(
+          '❌ You entered a PRIVATE KEY, not an Account ID!\n\n' +
+          'Account ID format: 0.0.xxxxx (short)\n' +
+          'Private Key: Long hex string (64+ chars)\n\n' +
+          'Please refresh and enter your Account ID (0.0.xxxxx)'
+        );
+      }
+
+      if (!/^0\.0\.\d+$/.test(trimmedAccountId)) {
+        throw new Error(
+          '❌ Invalid Account ID format!\n\n' +
+          'Expected: 0.0.xxxxx (e.g., 0.0.12345)\n' +
+          'You entered: ' + trimmedAccountId + '\n\n' +
+          'Make sure to include the dots: 0.0.12345'
+        );
       }
 
       const privateKey = prompt(
-        'Please enter your Hedera Private Key:\n\n' +
-        'This will be stored locally and used to sign transactions.\n' +
-        'Your key never leaves your browser.'
+        '🔑 STEP 2: Hedera Private Key\n\n' +
+        'Now enter your Hedera Testnet PRIVATE KEY\n' +
+        '(This is the long hex string)\n\n' +
+        'Format: Long string of letters and numbers\n' +
+        'Example: 302e020100300506032b657004220420...\n\n' +
+        '✅ Stored locally in your browser\n' +
+        '✅ Never sent to any server\n' +
+        '✅ Used only for Hedera transactions'
       );
 
       if (!privateKey) {
-        throw new Error('Private key is required for Hedera transactions');
+        throw new Error('❌ Hedera Private Key is required. Please try again.');
+      }
+
+      if (privateKey.trim().length < 32) {
+        throw new Error(
+          '❌ Private key seems too short!\n\n' +
+          'Private keys are usually 64+ characters long.\n' +
+          'Please check and enter the complete private key.'
+        );
       }
       
       // Store for future use
-      localStorage.setItem('hedera_account_id', accountId);
-      localStorage.setItem('hedera_private_key', privateKey);
+      localStorage.setItem('hedera_account_id', trimmedAccountId);
+      localStorage.setItem('hedera_private_key', privateKey.trim());
       console.log('[MetaMask] Hedera credentials saved');
-      console.log('[MetaMask] Account ID:', accountId);
+      console.log('[MetaMask] Account ID:', trimmedAccountId);
 
       return {
-        accountId,
-        privateKey
+        accountId: trimmedAccountId,
+        privateKey: privateKey.trim()
       };
     } catch (error) {
       console.error('[MetaMask] Error getting Hedera credentials:', error);
