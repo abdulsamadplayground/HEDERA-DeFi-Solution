@@ -250,35 +250,40 @@ function QuestGame({ onWin, onLose, gameType }) {
   };
 
   const handleFireballCollision = () => {
-    const hitMonsters = new Set();
-    setFireballs(prev => prev.filter(fb => {
-      let hit = false;
-      monsters.forEach(m => {
-        if (!hitMonsters.has(m.id) && Math.abs(fb.x - m.x) < 4 && Math.abs(fb.y - m.y) < 4) {
-          hit = true;
-          hitMonsters.add(m.id);
-        }
-      });
-      return !hit;
-    }));
-
-    setMonsters(prev => prev.map(m => {
-      if (hitMonsters.has(m.id)) {
-        const newHp = m.hp - 1;
-        if (newHp <= 0) {
-          setScore(s => s + m.points);
-          if (Math.random() < 0.25) spawnBuff(m.x, m.y);
-          if (m.isBoss) {
-            handleBossDefeat(m);
-          } else {
-            setMonstersKilled(prev => prev + 1);
+    setMonsters(prevMonsters => {
+      const hitMonsters = new Set();
+      
+      // Check collisions with current fireballs
+      setFireballs(prevFireballs => prevFireballs.filter(fb => {
+        let hit = false;
+        prevMonsters.forEach(m => {
+          if (!hitMonsters.has(m.id) && Math.abs(fb.x - m.x) < 4 && Math.abs(fb.y - m.y) < 4) {
+            hit = true;
+            hitMonsters.add(m.id);
           }
-          return null;
+        });
+        return !hit;
+      }));
+
+      // Update monsters that were hit
+      return prevMonsters.map(m => {
+        if (hitMonsters.has(m.id)) {
+          const newHp = m.hp - 1;
+          if (newHp <= 0) {
+            setScore(s => s + m.points);
+            if (Math.random() < 0.25) spawnBuff(m.x, m.y);
+            if (m.isBoss) {
+              handleBossDefeat(m);
+            } else {
+              setMonstersKilled(prev => prev + 1);
+            }
+            return null;
+          }
+          return { ...m, hp: newHp };
         }
-        return { ...m, hp: newHp };
-      }
-      return m;
-    }).filter(Boolean));
+        return m;
+      }).filter(Boolean);
+    });
   };
 
   const handleBossDefeat = (boss) => {
