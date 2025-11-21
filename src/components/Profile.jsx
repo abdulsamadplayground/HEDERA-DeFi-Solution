@@ -242,26 +242,26 @@ function Profile({ userStats, quests, onEquipBadge, onUnequipBadge, onChangeAvat
           </div>
           
           <div className="stat-card">
-            <div className="stat-icon">🍬</div>
+            <div className="stat-icon">🏃</div>
             <div className="stat-content">
-              <div className="stat-value">{userStats.gameStats?.pattern || 0}</div>
-              <div className="stat-label">Pattern Match Wins</div>
+              <div className="stat-value">{userStats.gameStats?.runner || 0}</div>
+              <div className="stat-label">Knight Runner Wins</div>
             </div>
           </div>
           
           <div className="stat-card">
-            <div className="stat-icon">🚀</div>
+            <div className="stat-icon">⚔️</div>
             <div className="stat-content">
-              <div className="stat-value">{userStats.gameStats?.shooter || 0}</div>
-              <div className="stat-label">Space Shooter Wins</div>
+              <div className="stat-value">{userStats.gameStats?.quest || 0}</div>
+              <div className="stat-label">Knight's Quest Wins</div>
             </div>
           </div>
           
           <div className="stat-card">
             <div className="stat-icon">🏆</div>
             <div className="stat-content">
-              <div className="stat-value">{userStats.highScores?.shooter || 0}</div>
-              <div className="stat-label">Shooter High Score</div>
+              <div className="stat-value">{userStats.highScores?.quest || 0}</div>
+              <div className="stat-label">Quest High Score</div>
             </div>
           </div>
           
