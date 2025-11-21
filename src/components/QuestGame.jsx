@@ -23,6 +23,8 @@ function QuestGame({ onWin, onLose, gameType }) {
   const spawnTimerRef = useRef(0);
   const monstersRef = useRef([]);
   const fireballsRef = useRef([]);
+  const playerPosRef = useRef({ x: 50, y: 80 });
+  const slashingRef = useRef(false);
 
   const monstersPerWave = 12;
   const maxWaves = 3;
@@ -52,6 +54,23 @@ function QuestGame({ onWin, onLose, gameType }) {
     const baseImage = backgrounds[wave - 1] || backgrounds[0];
     return `${overlays[wave - 1] || overlays[0]}, ${baseImage}`;
   };
+
+  // Update refs when state changes
+  useEffect(() => {
+    monstersRef.current = monsters;
+  }, [monsters]);
+
+  useEffect(() => {
+    fireballsRef.current = fireballs;
+  }, [fireballs]);
+
+  useEffect(() => {
+    playerPosRef.current = playerPos;
+  }, [playerPos]);
+
+  useEffect(() => {
+    slashingRef.current = slashing;
+  }, [slashing]);
 
   useEffect(() => {
     if (!gameOver && health > 0) {
