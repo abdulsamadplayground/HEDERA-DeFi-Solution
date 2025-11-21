@@ -4,9 +4,12 @@ import './DeFi.css';
 import HederaService from './services/HederaService';
 import MetaMaskService from './services/MetaMaskService';
 import QuestService from './services/QuestService';
+import AnalyticsService from './services/AnalyticsService';
+import OnboardingService from './services/OnboardingService';
 import GameSelector from './components/GameSelector';
 import Profile from './components/Profile';
 import AvatarSelector from './components/AvatarSelector';
+import Feedback from './components/Feedback';
 import { getAvatarEmoji } from './utils/avatars';
 
 function App() {
@@ -16,7 +19,6 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [connectionMethod, setConnectionMethod] = useState('privatekey');
-  const [ethereumAddress, setEthereumAddress] = useState('');
 
   // DeFi Gamification State
   const [quests, setQuests] = useState([]);
@@ -24,11 +26,8 @@ function App() {
   const [actionHistory, setActionHistory] = useState([]);
   const [activeTab, setActiveTab] = useState('quests'); // quests, actions, badges, leaderboard
   const [stakeAmount, setStakeAmount] = useState('100');
-  const [liquidityAmount, setLiquidityAmount] = useState('100');
   const [showQuestModal, setShowQuestModal] = useState(false);
   const [completedQuest, setCompletedQuest] = useState(null);
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [onboardingStep, setOnboardingStep] = useState(0);
   const [gameMessage, setGameMessage] = useState('');
   const [selectedAvatar, setSelectedAvatar] = useState(null);
   const [showAvatarSelection, setShowAvatarSelection] = useState(false);
@@ -37,13 +36,6 @@ function App() {
   useEffect(() => {
     console.log('[App] DeFi Gamification System initialized');
     console.log('[App] MetaMask installed:', MetaMaskService.isMetaMaskInstalled());
-    
-    // Check if first time user
-    const hasVisited = localStorage.getItem('has_visited');
-    if (!hasVisited) {
-      setShowOnboarding(true);
-      localStorage.setItem('has_visited', 'true');
-    }
   }, []);
 
   useEffect(() => {
@@ -51,7 +43,18 @@ function App() {
       loadUserData();
       // Record daily login
       QuestService.recordAction(accountId, 'login', 0, 'login-' + Date.now(), {});
+      // Start analytics session
+      AnalyticsService.startSession(accountId);
+      // Initialize onboarding if new user
+      OnboardingService.initializeUser(accountId);
     }
+    
+    // Cleanup on unmount
+    return () => {
+      if (isConnected) {
+        AnalyticsService.endSession();
+      }
+    };
   }, [isConnected, accountId]);
 
   const loadUserData = () => {
@@ -84,8 +87,8 @@ function App() {
         totalGameWins: 0,
         totalActions: 0,
         totalValue: 0,
-        gameStats: { tictactoe: 0, pattern: 0, shooter: 0 },
-        highScores: { shooter: 0 },
+        gameStats: { tictactoe: 0, runner: 0, quest: 0 },
+        highScores: { quest: 0 },
         dailyStreak: 0
       });
       setActionHistory([]);
@@ -100,7 +103,6 @@ function App() {
     try {
       const result = await MetaMaskService.connect();
       setAccountId(result.accountId);
-      setEthereumAddress(result.ethereumAddress);
       
       HederaService.initializeWithMetaMask(MetaMaskService, result.accountId, result.privateKey);
       
@@ -189,8 +191,11 @@ function App() {
       // Perform stake on Hedera
       const receipt = await HederaService.performStake(accountId, amount);
       
-      // Record action in quest system
-      const result = QuestService.recordAction(accountId, 'stake', amount, receipt.transactionId);
+      // Record action in quest system with source
+      const result = QuestService.recordAction(accountId, 'stake', amount, receipt.transactionId, { source: 'direct' });
+      
+      // Track in analytics
+      AnalyticsService.trackTransaction('stake', amount);
       
       // Update UI
       loadUserData();
@@ -210,40 +215,7 @@ function App() {
     }
   };
 
-  const handleProvideLiquidity = async () => {
-    console.log('[App] Initiating liquidity provision...');
-    setLoading(true);
-    setMessage(`⏳ Providing ${liquidityAmount} HBAR liquidity...`);
-    
-    try {
-      const amount = parseFloat(liquidityAmount);
-      if (isNaN(amount) || amount <= 0) {
-        throw new Error('Invalid amount');
-      }
 
-      // Perform liquidity provision on Hedera
-      const receipt = await HederaService.performLiquidityProvision(accountId, amount);
-      
-      // Record action in quest system
-      const result = QuestService.recordAction(accountId, 'provide_liquidity', amount, receipt.transactionId);
-      
-      // Update UI
-      loadUserData();
-      setMessage(`✅ Provided ${amount} HBAR liquidity successfully!`);
-      
-      // Check for completed quests
-      if (result.completedQuests.length > 0) {
-        await handleQuestCompletion(result.completedQuests);
-      }
-      
-      console.log('[App] Liquidity provision successful');
-    } catch (error) {
-      console.error('[App] Liquidity provision failed:', error);
-      setMessage(`❌ Error: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleQuestCompletion = async (completedQuests) => {
     console.log('[App] Processing quest completions:', completedQuests.length);
@@ -252,6 +224,10 @@ function App() {
       try {
         // Mint NFT badge for completed quest
         await HederaService.mintQuestBadge(accountId, quest);
+        
+        // Track in analytics
+        AnalyticsService.trackQuestCompleted(quest.id);
+        AnalyticsService.trackNFTMinted(quest.rewards.badge);
         
         // Show completion modal
         setCompletedQuest(quest);
@@ -284,6 +260,10 @@ function App() {
       
       // Record action in quest system with game data
       const result = QuestService.recordAction(accountId, 'game_win', amount, receipt.transactionId, gameData);
+      
+      // Track in analytics
+      AnalyticsService.trackGamePlayed(gameData.gameType, true);
+      AnalyticsService.trackTransaction('game_win', amount);
       
       // Update UI
       loadUserData();
@@ -350,6 +330,15 @@ function App() {
     }
   };
 
+  const handleClearMetaMaskCredentials = () => {
+    if (window.confirm('Clear stored Hedera credentials? You will need to re-enter them on next MetaMask connection.')) {
+      localStorage.removeItem('hedera_account_id');
+      localStorage.removeItem('hedera_private_key');
+      setMessage('✅ MetaMask credentials cleared!');
+      setTimeout(() => setMessage(''), 3000);
+    }
+  };
+
   const handleDisconnect = () => {
     console.log('[App] Disconnecting...');
     
@@ -360,7 +349,6 @@ function App() {
     setIsConnected(false);
     setAccountId('');
     setPrivateKey('');
-    setEthereumAddress('');
     setQuests([]);
     setUserStats(null);
     setActionHistory([]);
@@ -472,13 +460,22 @@ function App() {
                       </a>
                     </div>
                   ) : (
-                    <button 
-                      onClick={handleMetaMaskConnect} 
-                      className="btn btn-primary btn-metamask"
-                      disabled={loading}
-                    >
-                      {loading ? '⏳ Connecting...' : '🦊 Connect with MetaMask'}
-                    </button>
+                    <>
+                      <button 
+                        onClick={handleMetaMaskConnect} 
+                        className="btn btn-primary btn-metamask"
+                        disabled={loading}
+                      >
+                        {loading ? '⏳ Connecting...' : '🦊 Connect with MetaMask'}
+                      </button>
+                      <button 
+                        onClick={handleClearMetaMaskCredentials}
+                        className="btn btn-secondary"
+                        style={{ marginTop: '10px', width: '100%' }}
+                      >
+                        🔄 Clear Stored Credentials
+                      </button>
+                    </>
                   )}
                 </div>
               ) : (
@@ -621,6 +618,12 @@ function App() {
             onClick={() => setActiveTab('leaderboard')}
           >
             🏆 Leaderboard
+          </button>
+          <button 
+            className={`tab-btn ${activeTab === 'feedback' ? 'active' : ''}`}
+            onClick={() => setActiveTab('feedback')}
+          >
+            💬 Feedback
           </button>
         </div>
 
@@ -1043,34 +1046,7 @@ function App() {
                 </div>
               </div>
 
-              <div className="action-section disabled-section">
-                <h3>💧 Provide Liquidity</h3>
-                <p>Add liquidity to HBAR/USDC pool and earn fees</p>
-                <div className="action-input-group">
-                  <input
-                    type="number"
-                    value={liquidityAmount}
-                    onChange={(e) => setLiquidityAmount(e.target.value)}
-                    placeholder="Amount in HBAR"
-                    className="input"
-                    min="1"
-                    disabled
-                  />
-                  <button 
-                    onClick={handleProvideLiquidity}
-                    disabled={true}
-                    className="btn btn-primary btn-liquidity"
-                    title="Coming soon"
-                  >
-                    💧 Coming Soon
-                  </button>
-                </div>
-                <div className="action-info">
-                  <span>Pool: HBAR/USDC</span>
-                  <span>Fee: 0.3%</span>
-                  <span style={{color: '#ff9800', fontWeight: 'bold'}}>⚠️ Temporarily Disabled</span>
-                </div>
-              </div>
+
             </div>
           )}
 
@@ -1104,38 +1080,87 @@ function App() {
 
           {activeTab === 'history' && (
             <div className="history-list">
-              {actionHistory.length > 0 ? (
-                actionHistory.slice().reverse().map((action, index) => (
-                  <div key={index} className="history-item">
-                    <div className="history-icon">
-                      {action.action === 'stake' ? '💎' : '💧'}
-                    </div>
-                    <div className="history-content">
-                      <div className="history-action">
-                        {action.action === 'stake' ? 'Staked' : 'Provided Liquidity'}
+              {(() => {
+                // Filter to only show stake and game_win actions with amount > 0
+                const relevantActions = actionHistory.filter(action => 
+                  (action.action === 'stake' || action.action === 'game_win') && 
+                  action.amount > 0
+                );
+                
+                return relevantActions.length > 0 ? (
+                  relevantActions.slice().reverse().map((action, index) => {
+                    // Determine stake source - QuestService stores metadata as 'gameData'
+                    let stakeSource = 'Unknown';
+                    let stakeIcon = '💎';
+                    
+                    // Check gameData (from QuestService)
+                    if (action.gameData) {
+                      if (action.gameData.source === 'direct') {
+                        stakeSource = 'Direct Stake';
+                        stakeIcon = '💎';
+                      } else if (action.gameData.gameType) {
+                        // Game-based stake
+                        switch (action.gameData.gameType) {
+                          case 'tictactoe':
+                            stakeSource = 'Tic Tac Toe';
+                            stakeIcon = '⭕';
+                            break;
+                          case 'runner':
+                            stakeSource = 'Knight Runner';
+                            stakeIcon = '🏃';
+                            break;
+                          case 'quest':
+                            stakeSource = 'Knight\'s Quest';
+                            stakeIcon = '⚔️';
+                            break;
+                          default:
+                            stakeSource = `Game (${action.gameData.gameType})`;
+                            stakeIcon = '🎮';
+                        }
+                      }
+                    } else if (action.action === 'game_win') {
+                      // Fallback for game wins without gameData
+                      stakeSource = 'Game Win';
+                      stakeIcon = '🎮';
+                    } else if (action.action === 'stake') {
+                      // No gameData but action is stake - assume direct
+                      stakeSource = 'Direct Stake';
+                      stakeIcon = '💎';
+                    }
+                    
+                    return (
+                      <div key={index} className="history-item">
+                        <div className="history-icon">{stakeIcon}</div>
+                        <div className="history-content">
+                          <div className="history-action">
+                            <strong>{action.amount} HBAR</strong> staked via <strong>{stakeSource}</strong>
+                          </div>
+                          <div className="history-time">
+                            {new Date(action.timestamp).toLocaleString()}
+                          </div>
+                        </div>
+                        <a 
+                          href={`https://hashscan.io/testnet/transaction/${action.transactionId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="history-link"
+                        >
+                          View on HashScan →
+                        </a>
                       </div>
-                      <div className="history-amount">{action.amount} HBAR</div>
-                      <div className="history-time">
-                        {new Date(action.timestamp).toLocaleString()}
-                      </div>
-                    </div>
-                    <a 
-                      href={`https://hashscan.io/testnet/transaction/${action.transactionId}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="history-link"
-                    >
-                      View on HashScan →
-                    </a>
+                    );
+                  })
+                ) : (
+                  <div className="empty-state">
+                    <p>📜 No stake history yet</p>
+                    <p>Start staking directly or play games to see your history!</p>
                   </div>
-                ))
-              ) : (
-                <div className="empty-state">
-                  <p>📜 No actions yet</p>
-                  <p>Start staking or providing liquidity to see your history!</p>
-                </div>
-              )}
+                );
+              })()}
             </div>
+          )}
+          {activeTab === 'feedback' && (
+            <Feedback accountId={accountId} />
           )}
         </div>
 
