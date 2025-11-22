@@ -730,7 +730,8 @@ MIT License - see [LICENSE](LICENSE) file for details
 ### Contact & Links
 
 - **Live Demo**: [www.defiquest.com](https://www.defiquest.com)
-- **Demo Video**: [Watch on Google Drive](https://drive.google.com/file/d/1leUPPVqjMC_G897IUrCJx-2U9eSpJKUJ/view?usp=sharing)
+- **Demo Video**: [https://www.youtube.com/watch?v=R4ku97tORF4]
+- **Pitch Deck**: [Watch on Google Drive](https://drive.google.com/file/d/1leUPPVqjMC_G897IUrCJx-2U9eSpJKUJ/view?usp=sharing)
 - **GitHub**: [https://github.com/abdulsamadplayground/HEDERA-DeFi-Solution](https://github.com/abdulsamadplayground/HEDERA-DeFi-Solution)
 - **Hedera Portal**: https://portal.hedera.com
 - **HashScan**: https://hashscan.io/testnet
