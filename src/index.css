@@ -24,7 +24,9 @@ body {
   -moz-osx-font-smoothing: grayscale;
   line-height: 1.6;
   color: #f1f5f9;
-  background: #0f172a;
+  background: linear-gradient(rgba(15, 23, 42, 0.85), rgba(15, 23, 42, 0.85)), 
+              url('/assets/backgrounds/backgroungimg.jpg') center/cover fixed no-repeat;
+  min-height: 100vh;
 }
 
 code {
